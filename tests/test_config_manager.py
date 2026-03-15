@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import patch, mock_open
 from pathlib import Path
 
-from app.core.config_manager import load_config, save_config, get_templates_folder, set_templates_folder
+from app.core.config_manager import load_config, save_config, get_templates_folder, set_templates_folder, get_output_folder, set_output_folder
 
 
 @pytest.fixture
@@ -62,3 +62,22 @@ class TestGetSetTemplatesFolder:
     def test_get_missing_key(self, tmp_config):
         save_config({"other_key": "value"})
         assert get_templates_folder() == ""
+
+
+class TestGetSetOutputFolder:
+    def test_get_empty_when_no_config(self, tmp_config):
+        assert get_output_folder() == ""
+
+    def test_set_and_get(self, tmp_config):
+        set_output_folder("/my/output")
+        assert get_output_folder() == "/my/output"
+
+    def test_get_missing_key(self, tmp_config):
+        save_config({"templates_folder": "/some/path"})
+        assert get_output_folder() == ""
+
+    def test_both_folders_independent(self, tmp_config):
+        set_templates_folder("/templates")
+        set_output_folder("/output")
+        assert get_templates_folder() == "/templates"
+        assert get_output_folder() == "/output"

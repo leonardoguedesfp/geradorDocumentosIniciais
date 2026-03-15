@@ -44,3 +44,15 @@ def set_templates_folder(folder: str) -> None:
     config = load_config()
     config["templates_folder"] = folder
     save_config(config)
+
+
+def get_output_folder() -> str:
+    """Return the configured output folder path, or empty string."""
+    return load_config().get("output_folder", "")
+
+
+def set_output_folder(folder: str) -> None:
+    """Update the output folder path in config."""
+    config = load_config()
+    config["output_folder"] = folder
+    save_config(config)

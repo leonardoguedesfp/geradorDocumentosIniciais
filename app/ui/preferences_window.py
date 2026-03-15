@@ -5,7 +5,7 @@ from tkinter import filedialog
 
 from app.ui.styles import *
 from app.ui.components import StyledButton, StyledLabel, StyledEntry, StatusIndicator
-from app.core.config_manager import get_templates_folder, set_templates_folder
+from app.core.config_manager import get_templates_folder, set_templates_folder, get_output_folder, set_output_folder
 from app.core.template_loader import check_templates_folder, EXPECTED_FILES
 
 
@@ -16,7 +16,7 @@ class PreferencesWindow(ctk.CTkToplevel):
         super().__init__(master, **kwargs)
 
         self.title("Preferências")
-        self.geometry("600x300")
+        self.geometry("600x400")
         self.configure(fg_color=BG_MAIN)
         self.resizable(False, False)
         self.on_save_callback = on_save_callback
@@ -51,6 +51,27 @@ class PreferencesWindow(ctk.CTkToplevel):
             command=self._select_folder,
         ).pack(side="left", padx=(10, 0))
 
+        # Output folder
+        output_frame = ctk.CTkFrame(self, fg_color=BG_MAIN)
+        output_frame.pack(fill="x", padx=20, pady=(10, 5))
+
+        StyledLabel(output_frame, text="Pasta de saída dos documentos:").pack(anchor="w")
+
+        output_row = ctk.CTkFrame(output_frame, fg_color=BG_MAIN)
+        output_row.pack(fill="x", pady=5)
+
+        self.output_entry = StyledEntry(output_row, width=350)
+        self.output_entry.pack(side="left", fill="x", expand=True)
+
+        current_output = get_output_folder()
+        if current_output:
+            self.output_entry.insert(0, current_output)
+
+        StyledButton(
+            output_row, text="Selecionar...", primary=False, width=110,
+            command=self._select_output_folder,
+        ).pack(side="left", padx=(10, 0))
+
         # Status
         self.status = StatusIndicator(self)
         self.status.pack(anchor="w", padx=20, pady=5)
@@ -80,6 +101,12 @@ class PreferencesWindow(ctk.CTkToplevel):
             self.folder_entry.delete(0, "end")
             self.folder_entry.insert(0, path)
 
+    def _select_output_folder(self):
+        path = filedialog.askdirectory(title="Selecionar pasta de saída")
+        if path:
+            self.output_entry.delete(0, "end")
+            self.output_entry.insert(0, path)
+
     def _test_folder(self):
         folder = self.folder_entry.get().strip()
         if not folder:
@@ -96,7 +123,9 @@ class PreferencesWindow(ctk.CTkToplevel):
 
     def _save(self):
         folder = self.folder_entry.get().strip()
+        output = self.output_entry.get().strip()
         set_templates_folder(folder)
+        set_output_folder(output)
         self.status.set_ok("Configurações salvas")
 
         if self.on_save_callback:

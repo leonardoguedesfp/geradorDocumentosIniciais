@@ -16,7 +16,7 @@ from app.ui.tab_qualificacao import TabQualificacao
 from app.ui.tab_manual import TabManual
 from app.ui.preferences_window import PreferencesWindow
 from app.core.placeholder_engine import generate_document
-from app.core.pdf_converter import convert_to_pdf
+from app.core.config_manager import get_output_folder
 from app.core.validators import validate_cpf, normalize_cep, normalize_name, normalize_filename
 
 
@@ -55,11 +55,19 @@ class MainWindow(ctk.CTk):
         self.title("Ricardo Passos Advocacia — Gerador de Documentos")
         self.geometry("900x750")
         self.configure(fg_color=BG_MAIN)
-        self.minsize(800, 650)
+        self.minsize(800, 500)
 
         ctk.set_appearance_mode("light")
 
         self._create_header()
+
+        # Scrollable content area
+        self.scroll_frame = ctk.CTkScrollableFrame(
+            self, fg_color=BG_MAIN, scrollbar_button_color="#c5c2b9",
+            scrollbar_button_hover_color=NEUTRAL_TEXT,
+        )
+        self.scroll_frame.pack(fill="both", expand=True)
+
         self._create_template_section()
         self._create_data_tabs()
         self._create_generation_section()
@@ -89,17 +97,17 @@ class MainWindow(ctk.CTk):
 
     def _create_template_section(self):
         """Create template status section."""
-        self.section_templates = SectionTemplates(self)
+        self.section_templates = SectionTemplates(self.scroll_frame)
         self.section_templates.pack(fill="x", padx=10, pady=(10, 5))
 
     def _create_data_tabs(self):
         """Create the tabbed data input section."""
-        StyledLabel(self, text="Fonte de Dados do Cliente", is_title=True).pack(
+        StyledLabel(self.scroll_frame, text="Fonte de Dados do Cliente", is_title=True).pack(
             anchor="w", padx=15, pady=(10, 2),
         )
 
         self.tabview = ctk.CTkTabview(
-            self, fg_color=BG_MAIN,
+            self.scroll_frame, fg_color=BG_MAIN, height=350,
             segmented_button_fg_color=NEUTRAL_TEXT,
             segmented_button_selected_color=BLUE_PRIMARY,
             segmented_button_selected_hover_color=HOVER_COLOR,
@@ -107,7 +115,7 @@ class MainWindow(ctk.CTk):
             segmented_button_unselected_hover_color="#b5b2a9",
             text_color=HEADER_FG,
         )
-        self.tabview.pack(fill="both", expand=True, padx=10, pady=5)
+        self.tabview.pack(fill="x", padx=10, pady=5)
 
         tab1 = self.tabview.add("Excel / Forms")
         tab2 = self.tabview.add("Qualificação")
@@ -124,7 +132,7 @@ class MainWindow(ctk.CTk):
 
     def _create_generation_section(self):
         """Create document selection, destination, and generate button."""
-        gen_frame = ctk.CTkFrame(self, fg_color=BG_MAIN)
+        gen_frame = ctk.CTkFrame(self.scroll_frame, fg_color=BG_MAIN)
         gen_frame.pack(fill="x", padx=10, pady=(5, 10))
 
         # Document checkboxes
@@ -237,7 +245,12 @@ class MainWindow(ctk.CTk):
         if self.dest_var.get() == "custom" and self.custom_dest_path:
             return self.custom_dest_path
 
-        # Auto: use source dir for Excel, or user documents dir
+        # Use configured output folder from preferences
+        configured = get_output_folder()
+        if configured and os.path.isdir(configured):
+            return configured
+
+        # Fallback: use source dir for Excel, or user documents dir
         current_tab = self.tabview.get()
         if current_tab == "Excel / Forms" and self.tab_excel.get_source_dir():
             return self.tab_excel.get_source_dir()
@@ -316,7 +329,7 @@ class MainWindow(ctk.CTk):
         os.makedirs(output_dir, exist_ok=True)
 
         date_str = data_extenso()
-        total_tasks = len(clients) * len(selected_docs) * 2  # docx + pdf
+        total_tasks = len(clients) * len(selected_docs)
         completed = 0
         successes = []
         failures = []
@@ -347,26 +360,7 @@ class MainWindow(ctk.CTk):
                     generate_document(template_path, placeholders, docx_path)
                     successes.append(docx_path)
                 except Exception as e:
-                    failures.append((f"{client.nome_completo} - {DOC_TYPES[doc_type]} (.docx)", str(e)))
-
-                completed += 1
-                self.progress.set(completed / total_tasks)
-                self.update_idletasks()
-
-                # Generate .pdf
-                pdf_out = docx_path.replace(".docx", ".pdf")
-                # Track the pdf name too
-                pdf_base = os.path.splitext(os.path.basename(docx_path))[0]
-                used_names.add(pdf_base)  # Already tracked via docx
-                try:
-                    convert_to_pdf(docx_path, output_dir)
-                    pdf_path = os.path.join(output_dir, os.path.splitext(os.path.basename(docx_path))[0] + ".pdf")
-                    if os.path.exists(pdf_path):
-                        successes.append(pdf_path)
-                    else:
-                        failures.append((f"{client.nome_completo} - {DOC_TYPES[doc_type]} (.pdf)", "PDF não gerado"))
-                except Exception as e:
-                    failures.append((f"{client.nome_completo} - {DOC_TYPES[doc_type]} (.pdf)", str(e)))
+                    failures.append((f"{client.nome_completo} - {DOC_TYPES[doc_type]}", str(e)))
 
                 completed += 1
                 self.progress.set(completed / total_tasks)
